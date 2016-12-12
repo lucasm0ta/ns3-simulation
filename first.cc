@@ -1,11 +1,11 @@
 #include "ns3/core-module.h"
-#include "ns3/point-to-point-module.h"
-#include "ns3/network-module.h"
-#include "ns3/applications-module.h"
-#include "ns3/wifi-module.h"
-#include "ns3/mobility-module.h"
 #include "ns3/csma-module.h"
+#include "ns3/wifi-module.h"
+#include "ns3/network-module.h"
+#include "ns3/mobility-module.h"
 #include "ns3/internet-module.h"
+#include "ns3/point-to-point-module.h"
+#include "ns3/applications-module.h"
 
 using namespace ns3;
 
@@ -16,16 +16,16 @@ using namespace ns3;
 ///////////////////////////////////////////////////////////////////
 //                             TOPOLOGIA
 //
-//     WIFI  10.1.3.0                                     WIFI  10.1.4.0
+//     WIFI 2  10.1.5.0                                     WIFI 1 10.1.4.0
 //            AP                                      AP
-//  *         *                                       *         *
+//  *         *    10.1.1.0              10.1.2.0     *         *
 //  |  . . .  |       p2p                  p2p        | . . . . |
 // n10        n0----------------n0--------------------n0        n10
 //                              |
 //                              |       n10   servidor
 //                              |  . . . |       |
 //                              ==================
-//                                 LAN  10.1.2.0
+//                                 LAN  10.1.3.0
 ///////////////////////////////////////////////////////////////////
 
     
@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     if (verbose){
+        std::cout <<"Verbose"<<std::endl;
         LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
         LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
     }
@@ -134,37 +135,44 @@ int main(int argc, char *argv[])
     apDevices1 = wifi.Install(phy1, mac1, wifiApNode1);
     apDevices2 = wifi.Install(phy2, mac2, wifiApNode2);
     
+    //Posiciona os nós das WIFI
     MobilityHelper mobility1, mobility2;
+    Ptr<ListPositionAllocator> posAlloc1 =  CreateObject<ListPositionAllocator>();
+    posAlloc1->Add (Vector (-50.0, 45.0, 0.0));
+    posAlloc1->Add (Vector (-60.0, 45.0, 0.0));
+    posAlloc1->Add (Vector (-70.0, 45.0, 0.0));
+    posAlloc1->Add (Vector (-80.0, 45.0, 0.0));
+    posAlloc1->Add (Vector (-80.0, 35.0, 0.0));
+    posAlloc1->Add (Vector (-80.0, 25.0, 0.0));
+    posAlloc1->Add (Vector (-80.0, 15.0, 0.0));
+    posAlloc1->Add (Vector (-70.0, 15.0, 0.0));
+    posAlloc1->Add (Vector (-60.0, 15.0, 0.0));
+    posAlloc1->Add (Vector (-50.0, 15.0, 0.0));
+    posAlloc1->Add (Vector (-50.0, 30.0, 0.0));
+    mobility1.SetPositionAllocator (posAlloc1);
 
-    //Nós wireless podem se mover.
-    mobility1.SetPositionAllocator("ns3::GridPositionAllocator",
-                                   "MinX", DoubleValue(0.0),
-                                   "MinY", DoubleValue(0.0),
-                                   "DeltaX", DoubleValue(5.0),
-                                   "DeltaY", DoubleValue(10.0),
-                                   "GridWidth", UintegerValue(3),
-                                   "LayoutType", StringValue("RowFirst"));
-    mobility2.SetPositionAllocator("ns3::GridPositionAllocator",
-                                   "MinX", DoubleValue(30.0),
-                                   "MinY", DoubleValue(0.0),
-                                   "DeltaX", DoubleValue(5.0),
-                                   "DeltaY", DoubleValue(10.0),
-                                   "GridWidth", UintegerValue(3),
-                                   "LayoutType", StringValue("RowFirst"));
-    
-    //Faz os nós andarem aleatoriamente 
-    mobility1.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
-                               "Bounds", RectangleValue(Rectangle(-50, 50, -50, 50)));
-    mobility2.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
-                               "Bounds", RectangleValue(Rectangle(-50, 50, -50, 50)));
-                               
-    //instala capacidade de se mover                       
-    mobility1.Install(wifiStaNodes1);                       
+    Ptr<ListPositionAllocator> posAlloc2 =  CreateObject<ListPositionAllocator>();
+    posAlloc2->Add (Vector (-50.0, -45.0, 0.0));
+    posAlloc2->Add (Vector (-60.0, -45.0, 0.0));
+    posAlloc2->Add (Vector (-70.0, -45.0, 0.0));
+    posAlloc2->Add (Vector (-80.0, -45.0, 0.0));
+    posAlloc2->Add (Vector (-80.0, -35.0, 0.0));
+    posAlloc2->Add (Vector (-80.0, -25.0, 0.0));
+    posAlloc2->Add (Vector (-80.0, -15.0, 0.0));
+    posAlloc2->Add (Vector (-70.0, -15.0, 0.0));
+    posAlloc2->Add (Vector (-60.0, -15.0, 0.0));
+    posAlloc2->Add (Vector (-50.0, -15.0, 0.0));
+    posAlloc2->Add (Vector (-50.0, -30.0, 0.0));
+    mobility2.SetPositionAllocator (posAlloc2);
+
+    mobility1.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+    mobility2.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
+
+    //Outros nos da WIFI
+    mobility1.Install(wifiStaNodes1);
     mobility2.Install(wifiStaNodes2);
     
-    //Ponto de acesso não se move
-    mobility1.SetMobilityModel("ns3::ConstantPositionMobilityModel");
-    mobility2.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    //Ponto de acesso
     mobility1.Install(wifiApNode1);
     mobility2.Install(wifiApNode2);
     
@@ -203,6 +211,8 @@ int main(int argc, char *argv[])
     address.SetBase("10.1.5.0", "255.255.255.0");
     address.Assign(staDevices2);
     address.Assign(apDevices2);
+
+    NS_LOG_INFO ("Create Applications.");
     
     UdpEchoServerHelper echoServer(9);
     ApplicationContainer serverApps = echoServer.Install(csmaNodes.Get(nCsma));
@@ -215,11 +225,11 @@ int main(int argc, char *argv[])
     echoClient.SetAttribute("PacketSize", UintegerValue(1024));
 
     //Torna os pontos de acesso como echoClients
-    ApplicationContainer clientApps1 = echoClient.Install(wifiStaNodes1.Get(nWifi - 1));
+    ApplicationContainer clientApps1 = echoClient.Install(wifiStaNodes2.Get(2));
     clientApps1.Start(Seconds(0.0));
     clientApps1.Stop(Seconds(30.0));
         
-    ApplicationContainer clientApps2 = echoClient.Install(wifiStaNodes2.Get(nWifi - 1));
+    ApplicationContainer clientApps2 = echoClient.Install(wifiStaNodes1.Get(3));
     clientApps2.Start(Seconds(0.0));
     clientApps2.Stop(Seconds(30.0));
     
