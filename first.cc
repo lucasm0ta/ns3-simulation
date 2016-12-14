@@ -60,30 +60,53 @@ int main(int argc, char *argv[])
     
     Ptr<Node> bridgeCsmaNode = CreateObject<Node> ();
     
+    Ptr<Node> serverNode = CreateObject<Node> ();
+    
     NodeContainer routerNodes;
     routerNodes.Add(switchNode);
+    routerNodes.Add(serverNode);
     /////////////////////////////////////////////
     //                LAN
     /////////////////////////////////////////////
     
     CsmaHelper csma;
-    csma.SetChannelAttribute("DataRate", StringValue("100Mbps"));
+    csma.SetChannelAttribute("DataRate", StringValue("200Kbps"));
     csma.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
+    
+    CsmaHelper switchToBridge;
+    switchToBridge.SetChannelAttribute("DataRate", StringValue("4Mbps"));
+    switchToBridge.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
+    
+    CsmaHelper serverToBridge;
+    switchToBridge.SetChannelAttribute("DataRate", StringValue("6Mbps"));
+    switchToBridge.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
 
     //Nodes que serão parte da LAN
     NodeContainer csmaNodes;
     csmaNodes.Create(nCsma);
     csmaNodes.Add(switchNode);
+    csmaNodes.Add(serverNode);
     // std::cout <<"Csma Nodes: "<<csmaNodes.size() <<std::endl;
     
     NetDeviceContainer csmaDevices;
     NetDeviceContainer bridgeCsmaDevices;
-    for (int i = 0; i < nCsma + 1; i++){
+    for (int i = 0; i < nCsma ; i++){
         //Instala um canal csma entre o iésimo device da LAN e o bridge
         NetDeviceContainer link = csma.Install(NodeContainer(csmaNodes.Get(i), bridgeCsmaNode));
-        if (i<nCsma) routerNodes.Add(csmaNodes.Get(i));
-        csmaDevices.Add(link.Get (0));
-        bridgeCsmaDevices.Add(link.Get (1));
+        routerNodes.Add(csmaNodes.Get(i));
+        csmaDevices.Add(link.Get(0));
+        bridgeCsmaDevices.Add(link.Get(1));
+    }
+    {
+        //Linkar switch ao bridge
+        NetDeviceContainer link = switchToBridge.Install(NodeContainer(switchNode, bridgeCsmaNode));
+        csmaDevices.Add(link.Get(0));
+        bridgeCsmaDevices.Add(link.Get(1));
+        
+        //Linkar servidor ao bridge
+        NetDeviceContainer link2 = serverToBridge.Install(NodeContainer(serverNode, bridgeCsmaNode));
+        csmaDevices.Add(link2.Get(0));
+        bridgeCsmaDevices.Add(link2.Get(1));
     }
     
     BridgeHelper bridge;
@@ -108,9 +131,10 @@ int main(int argc, char *argv[])
     wifiApNode2.Create(1);
     
     PointToPointHelper pointToPoint;
-    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
-    
+    pointToPoint.SetDeviceAttribute("DataRate", StringValue ("3Mbps"));
+    pointToPoint.SetChannelAttribute("Delay", StringValue ("2ms"));
+        
+    //Conecta os AP de WIFI ao switch
     NetDeviceContainer w1_to_switch, w2_to_switch;
     w1_to_switch = pointToPoint.Install(NodeContainer(wifiApNode1, switchNode));
     w2_to_switch = pointToPoint.Install(NodeContainer(wifiApNode2, switchNode));
@@ -235,19 +259,33 @@ int main(int argc, char *argv[])
     NS_LOG_INFO ("Create Applications.");
     uint16_t port = 9;   // Discard port (RFC 863)
     
-    OnOffHelper onoff ("ns3::UdpSocketFactory", 
-                        Address(InetSocketAddress(Ipv4Address ("10.1.1.4"), port)));
-    onoff.SetConstantRate (DataRate ("500kb/s"));
+    Ptr<Ipv4> ipv4 = serverNode->GetObject<Ipv4>();
+    Ipv4InterfaceAddress iaddr = ipv4->GetAddress(1,0);
+    Ipv4Address addri = iaddr.GetLocal();
     
-    ApplicationContainer app = onoff.Install (wifiStaNodes2.Get(5));
+    OnOffHelper onoff ("ns3::UdpSocketFactory", 
+                       Address(InetSocketAddress(addri, port)));
+    onoff.SetConstantRate (DataRate ("200kb/s"));
+    
+    ApplicationContainer app = onoff.Install (wifiStaNodes2);
     // Start the application
     app.Start (Seconds (0.0));
-    app.Stop (Seconds (10.0));
-    /*
+    app.Stop (Seconds (30.0));
+    
+    ApplicationContainer app1 = onoff.Install (wifiStaNodes1);
+    // Start the application
+    app1.Start (Seconds (0.0));
+    app1.Stop (Seconds (30.0));
+    
+    ApplicationContainer app2 = onoff.Install (csmaNodes);
+    // Start the application
+    app2.Start (Seconds (0.0));
+    app2.Stop (Seconds (30.0));
+    
     // Create an optional packet sink to receive these packets
-    PacketSinkHelper sink ("ns3::UdpSocketFactory",
+    /*PacketSinkHelper sink ("ns3::UdpSocketFactory",
     Address (InetSocketAddress (Ipv4Address::GetAny (), port)));
-    ApplicationContainer sink1 = sink.Install (csmaNodes.Get(3));
+    ApplicationContainer sink1 = sink.Install (wifiStaNodes1);
     sink1.Start (Seconds (0.0));
     sink1.Stop (Seconds (10.0));*/
 
