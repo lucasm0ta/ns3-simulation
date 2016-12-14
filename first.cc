@@ -10,10 +10,6 @@
 
 using namespace ns3;
 
-/*
-    Baseado em https://www.nsnam.org/docs/tutorial/html/building-topologies.html#building-a-wireless-network-topology
-*/
-
 ///////////////////////////////////////////////////////////////////
 //                             TOPOLOGIA
 //
@@ -24,7 +20,7 @@ using namespace ns3;
 // n10        n0-------------[switch]---------------n0        n10
 //                              |
 //                              |
-//                     ==================   [bridge]  10.1.1.0
+//                     ==================   [bridge]  LAN 10.1.1.0
 //                     |  . . . |       |
 //                     n0      n10   servidor
 ///////////////////////////////////////////////////////////////////
@@ -55,47 +51,51 @@ int main(int argc, char *argv[])
         LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
         LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
     }
-    
+    //Nó do switch
     Ptr<Node> switchNode = CreateObject<Node> ();
     
+    //Nó do Bridge
     Ptr<Node> bridgeCsmaNode = CreateObject<Node> ();
     
+    //Nó do servidor
     Ptr<Node> serverNode = CreateObject<Node> ();
     
-    NodeContainer routerNodes;
+    NodeContainer routerNodes; //todos os nós para serem roteados
     routerNodes.Add(switchNode);
     routerNodes.Add(serverNode);
     /////////////////////////////////////////////
     //                LAN
     /////////////////////////////////////////////
     
+    //conexão dos clientes com o bridge
     CsmaHelper csma;
-    csma.SetChannelAttribute("DataRate", StringValue("200Kbps"));
+    csma.SetChannelAttribute("DataRate", StringValue("1Mbps"));
     csma.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
     
+    //conexão do switch com o bridge
     CsmaHelper switchToBridge;
-    switchToBridge.SetChannelAttribute("DataRate", StringValue("4Mbps"));
+    switchToBridge.SetChannelAttribute("DataRate", StringValue("7Mbps"));
     switchToBridge.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
     
+    //conexão do servidor com o bridge
     CsmaHelper serverToBridge;
-    switchToBridge.SetChannelAttribute("DataRate", StringValue("6Mbps"));
-    switchToBridge.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
+    serverToBridge.SetChannelAttribute("DataRate", StringValue("11Mbps"));
+    serverToBridge.SetChannelAttribute("Delay", TimeValue(NanoSeconds(6560)));
 
-    //Nodes que serão parte da LAN
+    //Nodes clientes da LAN
     NodeContainer csmaNodes;
     csmaNodes.Create(nCsma);
     csmaNodes.Add(switchNode);
     csmaNodes.Add(serverNode);
-    // std::cout <<"Csma Nodes: "<<csmaNodes.size() <<std::endl;
     
     NetDeviceContainer csmaDevices;
     NetDeviceContainer bridgeCsmaDevices;
-    for (int i = 0; i < nCsma ; i++){
+    for (int i = 0; i < nCsma; i++){
         //Instala um canal csma entre o iésimo device da LAN e o bridge
         NetDeviceContainer link = csma.Install(NodeContainer(csmaNodes.Get(i), bridgeCsmaNode));
         routerNodes.Add(csmaNodes.Get(i));
-        csmaDevices.Add(link.Get(0));
-        bridgeCsmaDevices.Add(link.Get(1));
+        csmaDevices.Add(link.Get (0));
+        bridgeCsmaDevices.Add(link.Get (1));
     }
     {
         //Linkar switch ao bridge
@@ -131,10 +131,9 @@ int main(int argc, char *argv[])
     wifiApNode2.Create(1);
     
     PointToPointHelper pointToPoint;
-    pointToPoint.SetDeviceAttribute("DataRate", StringValue ("3Mbps"));
-    pointToPoint.SetChannelAttribute("Delay", StringValue ("2ms"));
-        
-    //Conecta os AP de WIFI ao switch
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("3Mbps"));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("1ms"));
+    
     NetDeviceContainer w1_to_switch, w2_to_switch;
     w1_to_switch = pointToPoint.Install(NodeContainer(wifiApNode1, switchNode));
     w2_to_switch = pointToPoint.Install(NodeContainer(wifiApNode2, switchNode));
@@ -142,7 +141,6 @@ int main(int argc, char *argv[])
     routerNodes.Add(wifiApNode2.Get(0));
     routerNodes.Add(wifiApNode1.Get(0));
     
-    //WTF
     YansWifiChannelHelper channel1 = YansWifiChannelHelper::Default();
     YansWifiPhyHelper phy1 = YansWifiPhyHelper::Default();
     YansWifiChannelHelper channel2 = YansWifiChannelHelper::Default();
@@ -252,10 +250,9 @@ int main(int argc, char *argv[])
     //Popula tabela de roteamento
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
     
-    //Estrutura Cliente-Servidor
-    //
-    // Create an OnOff application to send UDP datagrams from node zero to node 1.
-    //
+    //////////////////
+    // Estrutura Cliente-Servidor
+    //////////////////
     NS_LOG_INFO ("Create Applications.");
     uint16_t port = 9;   // Discard port (RFC 863)
     
@@ -265,29 +262,19 @@ int main(int argc, char *argv[])
     
     OnOffHelper onoff ("ns3::UdpSocketFactory", 
                        Address(InetSocketAddress(addri, port)));
-    onoff.SetConstantRate (DataRate ("200kb/s"));
+    onoff.SetConstantRate (DataRate ("300kb/s"));
     
     ApplicationContainer app = onoff.Install (wifiStaNodes2);
-    // Start the application
     app.Start (Seconds (0.0));
     app.Stop (Seconds (30.0));
     
     ApplicationContainer app1 = onoff.Install (wifiStaNodes1);
-    // Start the application
     app1.Start (Seconds (0.0));
     app1.Stop (Seconds (30.0));
     
     ApplicationContainer app2 = onoff.Install (csmaNodes);
-    // Start the application
     app2.Start (Seconds (0.0));
     app2.Stop (Seconds (30.0));
-    
-    // Create an optional packet sink to receive these packets
-    /*PacketSinkHelper sink ("ns3::UdpSocketFactory",
-    Address (InetSocketAddress (Ipv4Address::GetAny (), port)));
-    ApplicationContainer sink1 = sink.Install (wifiStaNodes1);
-    sink1.Start (Seconds (0.0));
-    sink1.Stop (Seconds (10.0));*/
 
     Simulator::Stop(Seconds(30.0));
     
